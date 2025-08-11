@@ -1,0 +1,21 @@
+<Window x:Class="MemoryGame.Views.HighScoresWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Top 10 High Scores" Height="400" Width="420"
+        WindowStartupLocation="CenterOwner">
+	<Grid Margin="10">
+		<ListView ItemsSource="{Binding HighScores}" FontSize="14">
+			<ListView.View>
+				<GridView>
+					<GridViewColumn Header="Player" DisplayMemberBinding="{Binding PlayerName}" Width="120"/>
+					<GridViewColumn Header="Moves" DisplayMemberBinding="{Binding Moves}" Width="70"/>
+					<GridViewColumn Header="Time" DisplayMemberBinding="{Binding GameTime, StringFormat='mm\\:ss'}" Width="80"/>
+					<GridViewColumn Header="Date" DisplayMemberBinding="{Binding CompletedAt, StringFormat='yyyy-MM-dd HH:mm'}" Width="120"/>
+				</GridView>
+			</ListView.View>
+		</ListView>
+	</Grid>
+</Window>
