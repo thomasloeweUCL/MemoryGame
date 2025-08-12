@@ -15,134 +15,158 @@ using System.Windows.Threading;
 namespace MemoryGame.ViewModels
 {
     // The main ViewModel for the game. It holds all the game logic and state.
-    // It implements INotifyPropertyChanged to update the UI.
+    // It implements INotifyPropertyChanged to update the UI when its properties change.
     public class GameViewModel : INotifyPropertyChanged
     {
-        // The repository for saving/loading high scores. Using the interface type for flexibility.
+        // The repository for saving/loading high scores. Using the interface type ensures flexibility.
         private readonly IGameStatsRepository _statsRepository;
-        // A timer to track game duration. DispatcherTimer runs on the UI thread.
+        // A timer to track game duration. DispatcherTimer is used because it operates on the UI thread,
+        // which avoids cross-thread issues when updating UI-bound properties like GameTime.
         private DispatcherTimer _timer;
-        // The time when the current game started.
+        // The time when the current game started, used to calculate elapsed time.
         private DateTime _startTime;
 
-        // Private backing fields for the public properties.
+        // --- Private backing fields for public properties ---
+        // These fields hold the actual data.
         private string _playerName = "Player 1";
         private int _moveCount;
         private string _gameTime;
         private bool _isGameCompleted;
         private Card _firstSelectedCard;
         private Card _secondSelectedCard;
-        // A flag to prevent the player from clicking cards while a match is being checked.
+        // A flag to prevent the player from clicking other cards while a pair is being checked.
         private bool _isChecking;
 
-        // A collection of cards for the game board. ObservableCollection automatically notifies the UI of changes (add/remove).
+        // --- Public Properties for UI Binding ---
+
+        // A collection of cards for the game board.
+        // ObservableCollection is crucial for MVVM. It automatically notifies the UI
+        // when items are added, removed, or the whole collection is refreshed.
         public ObservableCollection<Card> Cards { get; set; }
-        // A collection for the high scores list.
+
+        // A collection for the high scores list, displayed in the HighScoresWindow.
         public ObservableCollection<GameStats> HighScores { get; set; }
 
-        // --- Public Properties for UI Binding ---
-        // These properties are bound to UI elements like TextBlocks and TextBoxes.
+        // The player's name. Bound to a TextBox in the UI for two-way communication.
         public string PlayerName { get => _playerName; set { _playerName = value; OnPropertyChanged(); } }
+
+        // The number of moves made. Bound to a TextBlock in the UI.
         public int MoveCount { get => _moveCount; set { _moveCount = value; OnPropertyChanged(); } }
+
+        // The formatted game time string (e.g., "01:23"). Bound to a TextBlock.
         public string GameTime { get => _gameTime; set { _gameTime = value; OnPropertyChanged(); } }
+
+        // A flag indicating if the game has been won. Used to show/hide the "Game Completed!" message.
         public bool IsGameCompleted { get => _isGameCompleted; set { _isGameCompleted = value; OnPropertyChanged(); } }
 
         // --- Commands for UI Binding ---
-        // These are bound to Buttons in the View.
+        // ICommand properties are bound to UI elements like Buttons.
+
+        // Command to handle a card being flipped.
         public ICommand FlipCardCommand { get; }
+        // Command to start a new game.
         public ICommand NewGameCommand { get; }
+        // Command to open the high scores window.
         public ICommand ShowHighScoresCommand { get; }
 
-        // Constructor
+        // --- Constructor ---
+        // This is executed once when a GameViewModel object is created.
         public GameViewModel()
         {
-            // Initialize the repository.
+            // Initialize the repository for data access.
             _statsRepository = new FileGameStatsRepository();
-            // Initialize the collections.
+            // Initialize the collections that the UI will bind to.
             Cards = new ObservableCollection<Card>();
             HighScores = new ObservableCollection<GameStats>();
 
-            // Initialize the commands, linking them to their respective methods.
+            // Instantiate the commands, linking them to their respective methods.
+            // The first parameter is the action to execute.
+            // The second (optional) parameter is a function that determines if the command can execute.
             FlipCardCommand = new RelayCommand(FlipCard, CanFlipCard);
             NewGameCommand = new RelayCommand(_ => NewGame());
             ShowHighScoresCommand = new RelayCommand(_ => ShowHighScores());
 
-            // Start the first game automatically.
+            // Start the first game automatically when the application launches.
             NewGame();
         }
 
         // --- Game Logic Methods ---
+
+        // Sets up and starts a new game.
         private void NewGame()
         {
-            // Define the set of symbols.
+            // Define the set of symbols for the cards.
             var symbols = new List<string> { "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼" };
-            // Duplicate the symbols to create pairs, and randomize their order using LINQ.
+            // Create pairs by concatenating the list with itself, then shuffle the order randomly.
             var cardSymbols = symbols.Concat(symbols).OrderBy(s => Guid.NewGuid()).ToList();
 
-            // Clear the old cards from the board.
+            // Clear any cards from a previous game. The UI updates automatically.
             Cards.Clear();
-            // Create and add 16 new cards to the collection.
+            // Create 16 new card objects and add them to the collection.
             for (int i = 0; i < 16; i++)
             {
                 Cards.Add(new Card { Id = i, Symbol = cardSymbols[i] });
             }
 
-            // Reset game state variables.
+            // Reset the game's state variables.
             ResetSelection();
             MoveCount = 0;
             GameTime = "00:00";
             IsGameCompleted = false;
 
-            // Setup and start the game timer.
+            // --- Timer Setup ---
             _startTime = DateTime.Now;
-            _timer?.Stop();
+            _timer?.Stop(); // Stop any existing timer.
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += (sender, args) =>
             {
-                // Every second, update the GameTime property. The UI will update automatically.
+                // This code runs every second. It updates the GameTime property.
+                // Because of INotifyPropertyChanged, the UI's TextBlock for the time will update automatically.
                 GameTime = (DateTime.Now - _startTime).ToString(@"mm\:ss");
             };
             _timer.Start();
         }
 
-        // Determines if a card can be flipped. Used by FlipCardCommand.
+        // Determines if the FlipCardCommand can be executed.
         private bool CanFlipCard(object parameter)
         {
-            // A card can be flipped only if it is a Card, not already flipped, not already matched,
-            // and we are not currently in the middle of checking a pair.
+            // A card can be flipped only if:
+            // 1. The clicked item is actually a Card object.
+            // 2. The card is not already flipped.
+            // 3. The card is not already matched.
+            // 4. We are not currently in the middle of checking a pair (_isChecking is false).
             return parameter is Card card && !card.IsFlipped && !card.IsMatched && !_isChecking;
         }
 
-        // The main action when a card is clicked. Called by FlipCardCommand.
+        // The main action when a card is clicked. This method is asynchronous.
         private async void FlipCard(object parameter)
         {
             var card = parameter as Card;
-            if (card == null) return;
+            if (card == null) return; // Safety check.
 
-            // Flip the card. The UI updates because Card.IsFlipped calls OnPropertyChanged.
-            card.IsFlipped = true;
+            card.IsFlipped = true; // Flip the card. The UI updates via the Card's OnPropertyChanged.
 
             if (_firstSelectedCard == null)
             {
-                // This is the first card of a pair being flipped.
+                // This is the first card of a pair being flipped. Store it.
                 _firstSelectedCard = card;
             }
             else
             {
                 // This is the second card.
                 _secondSelectedCard = card;
-                _isChecking = true; // Prevent more clicks.
-                CommandManager.InvalidateRequerySuggested(); // Manually tell commands to re-evaluate CanExecute.
+                _isChecking = true; // Set flag to prevent more clicks.
+                CommandManager.InvalidateRequerySuggested(); // Force commands to re-evaluate their CanExecute status.
 
-                MoveCount++; // Increment the move counter.
-                await CheckForMatchAsync(); // Check if the two cards are a match.
+                MoveCount++; // A move consists of flipping a pair.
+                await CheckForMatchAsync(); // Asynchronously check if the two cards are a match.
 
-                _isChecking = false; // Allow clicks again.
+                _isChecking = false; // Reset the flag to allow clicks again.
                 CommandManager.InvalidateRequerySuggested(); // Re-evaluate commands again.
             }
         }
 
-        // Checks if the two selected cards are a match.
+        // Checks if the two selected cards match. 'async Task' allows for the use of 'await'.
         private async Task CheckForMatchAsync()
         {
             if (_firstSelectedCard.Symbol == _secondSelectedCard.Symbol)
@@ -155,7 +179,8 @@ namespace MemoryGame.ViewModels
             }
             else
             {
-                // Not a match. Wait for a moment so the player can see the second card.
+                // Not a match. Wait for 800ms so the player can see the second card.
+                // 'await' pauses this method without freezing the UI.
                 await Task.Delay(800);
                 // Flip both cards back down.
                 _firstSelectedCard.IsFlipped = false;
@@ -164,64 +189,67 @@ namespace MemoryGame.ViewModels
             }
         }
 
-        // Resets the selected cards.
+        // Clears the references to the selected cards.
         private void ResetSelection()
         {
             _firstSelectedCard = null;
             _secondSelectedCard = null;
         }
 
-        // Checks if all cards have been matched.
+        // Checks if all cards have been matched to determine if the game is over.
         private void CheckForGameCompletion()
         {
-            // If all cards on the board are matched...
+            // LINQ's .All() method checks if every item in the collection satisfies the condition.
             if (Cards.All(c => c.IsMatched))
             {
-                IsGameCompleted = true; // Set the completion flag.
+                IsGameCompleted = true; // Set the flag that the UI is bound to.
                 _timer.Stop(); // Stop the game timer.
                 SaveStats(); // Save the game result.
             }
         }
 
-        // Saves the current game's stats.
+        // Saves the current game's stats using the repository.
         private void SaveStats()
         {
+            // Create a new GameStats object with the final data.
             var stats = new GameStats
             {
-                // Use a default name if the player name is empty.
+                // Use a default name if the player name is empty or just whitespace.
                 PlayerName = string.IsNullOrWhiteSpace(PlayerName) ? "Unknown" : PlayerName,
                 Moves = MoveCount,
                 GameTime = DateTime.Now - _startTime,
                 CompletedAt = DateTime.Now
             };
-            // Use the repository to save the stats.
+            // Pass the object to the repository to handle the actual saving.
             _statsRepository.SaveStats(stats);
         }
 
-        // Shows the high scores window.
+        // Prepares and shows the high scores window.
         private void ShowHighScores()
         {
             // Retrieve the top scores from the repository.
             var scores = _statsRepository.GetTopTenScores();
-            // Clear the existing high scores and add the new ones.
+            // Clear the existing high scores and add the freshly retrieved ones.
             HighScores.Clear();
             foreach (var score in scores)
             {
                 HighScores.Add(score);
             }
 
-            // Create and show the high scores window.
+            // Create a new instance of the HighScoresWindow.
             var highScoresView = new HighScoresWindow
             {
-                // Set this GameViewModel instance as the DataContext for the new window,
-                // so it can bind to the HighScores collection.
                 DataContext = this
             };
+            // Show the window as a dialog, which blocks interaction with the main window until it's closed.
             highScoresView.ShowDialog();
         }
 
-        // Standard implementation for INotifyPropertyChanged.
+        // Standard implementation for the INotifyPropertyChanged interface.
         public event PropertyChangedEventHandler PropertyChanged;
+
+        // Helper method to raise the PropertyChanged event.
+        // The [CallerMemberName] attribute automatically passes the name of the calling property.
         protected void OnPropertyChanged([CallerMemberName] string name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

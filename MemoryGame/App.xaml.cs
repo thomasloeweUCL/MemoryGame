@@ -9,6 +9,7 @@ namespace MemoryGame
     /// </summary>
     public partial class App : Application
     {
+        // Code-behind for App.xaml
     }
 
 }
