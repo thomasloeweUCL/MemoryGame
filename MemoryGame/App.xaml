@@ -1,10 +1,9 @@
 ﻿<Application x:Class="MemoryGame.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:MemoryGame"
-             xmlns:converters="clr-namespace:MemoryGame.Converters"
              StartupUri="Views/MainWindow.xaml">
     <Application.Resources>
-        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <!-- Bruger indbygget converter -->
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </Application.Resources>
 </Application>

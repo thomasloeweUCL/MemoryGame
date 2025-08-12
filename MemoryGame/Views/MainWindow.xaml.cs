@@ -18,8 +18,7 @@ namespace MemoryGame.Views
         {
             InitializeComponent();
 
-            // Denne linje er afgørende. 
-            // Den opretter en ny GameViewModel og fortæller vinduet,
+            // Denne linje opretter en ny gameviewmodel og fortæller vinduet,
             // at det er dén, alle bindings skal hente data fra.
             DataContext = new GameViewModel();
         }

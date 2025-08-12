@@ -35,16 +35,17 @@
                     <DataTemplate>
                         <Button Command="{Binding DataContext.FlipCardCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                 CommandParameter="{Binding}"
-                                Margin="5" FontSize="28" FontWeight="Bold"
+                                Margin="5" FontSize="32" FontWeight="Bold"
                                 Background="CornflowerBlue">
                             <Button.Style>
                                 <Style TargetType="Button">
-                                    <Setter Property="Content" Value="❓"/>
+                                    <Setter Property="Content" Value=""/>
                                     <Setter Property="Foreground" Value="White"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsFlipped}" Value="True">
                                             <Setter Property="Content" Value="{Binding Symbol}"/>
                                             <Setter Property="Background" Value="LightGray"/>
+                                            <Setter Property="Foreground" Value="Black"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsMatched}" Value="True">
                                             <Setter Property="Background" Value="LightGreen"/>
